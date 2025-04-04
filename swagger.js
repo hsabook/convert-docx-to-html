@@ -1,4 +1,6 @@
 const swaggerJSDoc = require('swagger-jsdoc');
+const PORT = process.env.PORT || 3000;
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 // Swagger definition
 const swaggerDefinition = {
@@ -19,8 +21,8 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
-      description: 'Development server'
+      url: BASE_URL,
+      description: 'API Server'
     }
   ],
   tags: [
