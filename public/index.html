@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Converter with Base64 Images</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            max-height: 300px;
+            overflow: auto;
+        }
+        .stats {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e9f5e9;
+            border-radius: 5px;
+        }
+        .progress {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #f9f9f9;
+            border-color: #ddd;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>HTML Converter with Base64 Images</h1>
+    
+    <div class="tabs">
+        <div class="tab active" data-tab="zip">ZIP Upload</div>
+        <div class="tab" data-tab="docx">DOCX Upload</div>
+    </div>
+    
+    <div id="zipTab" class="tab-content active">
+        <div class="container">
+            <div class="form-group">
+                <label for="zipFile">Upload ZIP file containing HTML and images:</label>
+                <input type="file" id="zipFile" accept=".zip" />
+            </div>
+            
+            <button id="convertZipBtn">Convert</button>
+            
+            <div id="zipProgress" class="progress">
+                <div class="spinner"></div>
+                <p>Processing... This may take a moment.</p>
+            </div>
+            
+            <div id="zipError" class="error"></div>
+        </div>
+    </div>
+    
+    <div id="docxTab" class="tab-content">
+        <div class="container">
+            <div class="form-group">
+                <label for="docxFile">Upload DOCX file to convert to HTML with base64 images:</label>
+                <input type="file" id="docxFile" accept=".docx" />
+            </div>
+            
+            <button id="convertDocxBtn">Convert</button>
+            
+            <div id="docxProgress" class="progress">
+                <div class="spinner"></div>
+                <p>Processing... This may take a moment. Converting DOCX files can take longer.</p>
+            </div>
+            
+            <div id="docxError" class="error"></div>
+        </div>
+    </div>
+    
+    <div id="statsContainer" style="display: none;" class="stats">
+        <h3>Conversion Stats</h3>
+        <div id="stats"></div>
+    </div>
+    
+    <div id="resultContainer" style="display: none;">
+        <h3>Processed HTML</h3>
+        <div class="result">
+            <pre id="result"></pre>
+        </div>
+        
+        <h3>Preview</h3>
+        <div class="container">
+            <iframe id="preview" style="width: 100%; height: 400px; border: 1px solid #ddd;"></iframe>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Update active tab
+                    tabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show current tab content, hide others
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    document.getElementById(tabId + 'Tab').classList.add('active');
+                });
+            });
+            
+            // ZIP Tab Elements
+            const convertZipBtn = document.getElementById('convertZipBtn');
+            const zipFileInput = document.getElementById('zipFile');
+            const zipProgress = document.getElementById('zipProgress');
+            const zipError = document.getElementById('zipError');
+            
+            // DOCX Tab Elements
+            const convertDocxBtn = document.getElementById('convertDocxBtn');
+            const docxFileInput = document.getElementById('docxFile');
+            const docxProgress = document.getElementById('docxProgress');
+            const docxError = document.getElementById('docxError');
+            
+            // Common Result Elements
+            const resultContainer = document.getElementById('resultContainer');
+            const resultPre = document.getElementById('result');
+            const statsContainer = document.getElementById('statsContainer');
+            const statsDiv = document.getElementById('stats');
+            const previewFrame = document.getElementById('preview');
+            
+            // API URLs
+            const zipApiUrl = '/api/convert';
+            const docxApiUrl = '/api/docx-to-html';
+            
+            // Process response function (common for both ZIP and DOCX)
+            function processResponse(data, error) {
+                if (data && data.success) {
+                    // Display the processed HTML
+                    resultPre.textContent = data.data.html;
+                    resultContainer.style.display = 'block';
+                    
+                    // Display stats
+                    let statsHTML = `
+                        <p><strong>File Name:</strong> ${data.data.stats.fileName}</p>
+                        <p><strong>File Size:</strong> ${data.data.stats.fileSize}</p>
+                        <p><strong>Images Converted:</strong> ${data.data.stats.imagesConverted}/${data.data.stats.totalImages}</p>
+                        <p><strong>Status:</strong> ${data.data.stats.success ? 'Success ✅' : 'Failed ❌'}</p>
+                    `;
+                    statsDiv.innerHTML = statsHTML;
+                    statsContainer.style.display = 'block';
+                    
+                    // Set up preview iframe
+                    const blob = new Blob([data.data.html], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    previewFrame.src = url;
+                } else {
+                    error.textContent = (data && data.message) || 'An error occurred during conversion';
+                }
+            }
+            
+            // ZIP conversion handler
+            convertZipBtn.addEventListener('click', async function() {
+                if (!zipFileInput.files.length) {
+                    zipError.textContent = 'Please select a ZIP file to upload';
+                    return;
+                }
+                
+                const zipFile = zipFileInput.files[0];
+                if (!zipFile.name.endsWith('.zip')) {
+                    zipError.textContent = 'Please select a valid ZIP file';
+                    return;
+                }
+                
+                // Clear previous results
+                zipError.textContent = '';
+                resultPre.textContent = '';
+                statsDiv.innerHTML = '';
+                resultContainer.style.display = 'none';
+                statsContainer.style.display = 'none';
+                
+                // Show progress
+                zipProgress.style.display = 'block';
+                convertZipBtn.disabled = true;
+                
+                try {
+                    // Prepare form data
+                    const formData = new FormData();
+                    formData.append('zipFile', zipFile);
+                    
+                    // Send request to API
+                    const response = await fetch(zipApiUrl, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Hide progress
+                    zipProgress.style.display = 'none';
+                    convertZipBtn.disabled = false;
+                    
+                    processResponse(data, zipError);
+                } catch (error) {
+                    zipProgress.style.display = 'none';
+                    convertZipBtn.disabled = false;
+                    zipError.textContent = 'Error: ' + (error.message || 'Failed to connect to the server');
+                }
+            });
+            
+            // DOCX conversion handler
+            convertDocxBtn.addEventListener('click', async function() {
+                if (!docxFileInput.files.length) {
+                    docxError.textContent = 'Please select a DOCX file to upload';
+                    return;
+                }
+                
+                const docxFile = docxFileInput.files[0];
+                if (!docxFile.name.endsWith('.docx')) {
+                    docxError.textContent = 'Please select a valid DOCX file';
+                    return;
+                }
+                
+                // Clear previous results
+                docxError.textContent = '';
+                resultPre.textContent = '';
+                statsDiv.innerHTML = '';
+                resultContainer.style.display = 'none';
+                statsContainer.style.display = 'none';
+                
+                // Show progress
+                docxProgress.style.display = 'block';
+                convertDocxBtn.disabled = true;
+                
+                try {
+                    // Prepare form data
+                    const formData = new FormData();
+                    formData.append('docxFile', docxFile);
+                    
+                    // Send request to API
+                    const response = await fetch(docxApiUrl, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Hide progress
+                    docxProgress.style.display = 'none';
+                    convertDocxBtn.disabled = false;
+                    
+                    processResponse(data, docxError);
+                } catch (error) {
+                    docxProgress.style.display = 'none';
+                    convertDocxBtn.disabled = false;
+                    docxError.textContent = 'Error: ' + (error.message || 'Failed to connect to the server');
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
